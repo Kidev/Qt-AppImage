@@ -1,0 +1,47 @@
+name: 'Qt to AppImage'
+description: 'Converts a Qt application built and installed into an AppImage '
+author: 'Kidev'
+
+inputs:
+  install_folder:
+    description: 'Path to folder where Qt installed your project'
+    required: true
+  app_name:
+    description: 'Application name (deduced from executable if not provided)'
+    required: false
+    default: ''
+  comment:
+    description: 'Application comment for desktop entry'
+    required: false
+    default: ''
+  category:
+    description: 'Desktop entry category'
+    required: false
+    default: 'Utility'
+  icon:
+    description: 'Path to icon file'
+    required: false
+    default: ''
+  binary:
+    description: 'Binary name (deduced from install_folder/bin/ if not provided)'
+    required: false
+    default: ''
+
+outputs:
+  appimage:
+    description: 'Path to the generated AppImage file'
+
+runs:
+  using: 'docker'
+  image: 'Dockerfile'
+  args:
+    - ${{ inputs.install_folder }}
+    - ${{ inputs.app_name }}
+    - ${{ inputs.comment }}
+    - ${{ inputs.category }}
+    - ${{ inputs.icon }}
+    - ${{ inputs.binary }}
+
+branding:
+  icon: 'package'
+  color: 'green'

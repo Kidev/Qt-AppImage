@@ -9,7 +9,7 @@ CATEGORY="$4"
 ICON="$5"
 BINARY="$6"
 
-echo "== Qt to AppImage Converter =="
+echo "====== Qt to AppImage ======"
 echo "Install folder: $INSTALL_FOLDER"
 echo "App name: $APP_NAME"
 echo "Comment: $COMMENT"
@@ -20,32 +20,63 @@ echo "=========================="
 
 # Validate install folder exists
 if [ ! -d "$INSTALL_FOLDER" ]; then
-  echo "Error: Qt folder '$INSTALL_FOLDER' does not exist"
-  exit 1
+    echo "Error: install folder '$INSTALL_FOLDER' does not exist"
+    exit 1
 fi
+
+# Debug: List contents of bin directory
+echo "Contents of $INSTALL_FOLDER/bin/:"
+ls -la "$INSTALL_FOLDER/bin/" || echo "Directory does not exist or is not accessible"
 
 # Find binary if not specified
 if [ -z "$BINARY" ]; then
-  echo "Searching for binary in $INSTALL_FOLDER/bin/"
-  # Find first executable that's not qt.conf
-  BINARY=$(find "$INSTALL_FOLDER/bin" -type f -executable ! -name "qt.conf" | head -1 | xargs basename 2>/dev/null)
-  if [ -z "$BINARY" ]; then
-    echo "Error: No executable found in $INSTALL_FOLDER/bin/"
-    exit 1
-  fi
-  echo "Found binary: $BINARY"
+    echo "Searching for binary in $INSTALL_FOLDER/bin/"
+
+    # First, check if bin directory exists
+    if [ ! -d "$INSTALL_FOLDER/bin" ]; then
+        echo "Error: $INSTALL_FOLDER/bin directory does not exist"
+        exit 1
+    fi
+
+    # Find first executable file that's not qt.conf
+    BINARY_FULL_PATH=$(find "$INSTALL_FOLDER/bin" -type f -executable ! -name "qt.conf" | head -1)
+
+    if [ -z "$BINARY_FULL_PATH" ]; then
+        echo "Error: No executable found in $INSTALL_FOLDER/bin/"
+        echo "Checking for any files in $INSTALL_FOLDER/bin/:"
+        find "$INSTALL_FOLDER/bin" -type f | head -5
+        exit 1
+    fi
+
+    BINARY=$(basename "$BINARY_FULL_PATH")
+    echo "Found binary: $BINARY at $BINARY_FULL_PATH"
+
+    # Verify the binary actually exists and is executable
+    if [ ! -f "$BINARY_FULL_PATH" ]; then
+        echo "Error: Found binary $BINARY_FULL_PATH does not exist"
+        exit 1
+    fi
+
+    if [ ! -x "$BINARY_FULL_PATH" ]; then
+        echo "Warning: Binary $BINARY_FULL_PATH is not executable, making it executable..."
+        chmod +x "$BINARY_FULL_PATH"
+    fi
+else
+    BINARY_FULL_PATH="$INSTALL_FOLDER/bin/$BINARY"
 fi
 
 # Verify binary exists
-if [ ! -f "$INSTALL_FOLDER/bin/$BINARY" ]; then
-  echo "Error: Binary '$BINARY' not found in $INSTALL_FOLDER/bin/"
-  exit 1
+if [ ! -f "$BINARY_FULL_PATH" ]; then
+    echo "Error: Binary '$BINARY' not found at $BINARY_FULL_PATH"
+    echo "Available files in $INSTALL_FOLDER/bin/:"
+    find "$INSTALL_FOLDER/bin" -type f | head -10
+    exit 1
 fi
 
 # Deduce app name if not specified
 if [ -z "$APP_NAME" ]; then
-  APP_NAME="${BINARY}"
-  echo "Deduced app name: $APP_NAME"
+    APP_NAME="${BINARY}"
+    echo "Deduced app name: $APP_NAME"
 fi
 
 # Create AppDir
@@ -55,26 +86,38 @@ mkdir -p "$APPDIR"
 cd "$APPDIR"
 
 # Copy binary
-cp "$INSTALL_FOLDER/bin/$BINARY" .
+echo "Copying binary from $BINARY_FULL_PATH to ./$BINARY"
+cp "$BINARY_FULL_PATH" ./$BINARY
+
+# Make sure binary is executable
+chmod +x ./$BINARY
 
 # Copy qt.conf if exists
 if [ -f "$INSTALL_FOLDER/bin/qt.conf" ]; then
-  cp "$INSTALL_FOLDER/bin/qt.conf" .
+    cp "$INSTALL_FOLDER/bin/qt.conf" .
 fi
 
 # Copy libraries
-cp -r "$INSTALL_FOLDER/lib" .
+if [ -d "$INSTALL_FOLDER/lib" ]; then
+    cp -r "$INSTALL_FOLDER/lib" .
+else
+    echo "Warning: No lib directory found in $INSTALL_FOLDER"
+fi
 
 # Copy plugins
-cp -r "$INSTALL_FOLDER/plugins" .
+if [ -d "$INSTALL_FOLDER/plugins" ]; then
+    cp -r "$INSTALL_FOLDER/plugins" .
+else
+    echo "Warning: No plugins directory found in $INSTALL_FOLDER"
+fi
 
 # Copy QML modules if they exist
 if [ -d "$INSTALL_FOLDER/qml" ]; then
-  cp -r "$INSTALL_FOLDER/qml" .
+    cp -r "$INSTALL_FOLDER/qml" .
 fi
 
 # Create AppRun script
-cat >AppRun <<'EOF'
+cat > AppRun << 'EOF'
 #!/bin/bash
 HERE="$(dirname "$(readlink -f "${0}")")"
 export PATH="${HERE}:${PATH}"
@@ -93,7 +136,7 @@ sed -i "s/BINARY_PLACEHOLDER/$BINARY/g" AppRun
 chmod +x AppRun
 
 # Create desktop file
-cat >"${BINARY}.desktop" <<EOF
+cat > "${BINARY}.desktop" << EOF
 [Desktop Entry]
 Type=Application
 Name=${APP_NAME}
@@ -106,11 +149,12 @@ EOF
 
 # Handle icon
 if [ -n "$ICON" ] && [ -f "$ICON" ]; then
-  cp "$ICON" "${BINARY}.png"
+    cp "$ICON" "${BINARY}.png"
 else
-  # Create a simple default icon
-  convert -size 128x128 xc:transparent -fill "#41cd52" -draw "circle 64,64 64,16" \
-    -fill white -pointsize 48 -gravity center -annotate 0 "Qt" "${BINARY}.png"
+    # Create a simple default icon
+    echo "Creating default icon..."
+    convert -size 128x128 xc:transparent -fill "#41cd52" -draw "circle 64,64 64,16" \
+        -fill white -pointsize 48 -gravity center -annotate 0 "Qt" "${BINARY}.png"
 fi
 
 # Strip debug symbols to reduce size

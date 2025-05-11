@@ -1,4 +1,3 @@
-# Dockerfile
 FROM ubuntu:24.04
 
 # Avoid interactive prompts during build
@@ -11,6 +10,10 @@ RUN apt-get update && apt-get install -y \
     wget \
     patchelf \
     imagemagick \
+    tar \
+    gzip \
+    fuse \
+    libfuse2 \
     && rm -rf /var/lib/apt/lists/*
 
 # Download appimagetool

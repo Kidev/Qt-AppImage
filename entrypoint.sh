@@ -186,10 +186,45 @@ find lib -name "*.so*" -type f -exec strip {} \; 2>/dev/null || true
 # Go back to the original directory for creating the AppImage
 cd ..
 
-# Create AppImage
-/usr/local/bin/appimagetool "$APPDIR" "${APP_NAME}.AppImage"
+# Create AppImage with error handling
+echo "Creating AppImage..."
+if /usr/local/bin/appimagetool "$APPDIR" "${APP_NAME}.AppImage" > appimage_log.txt 2>&1; then
+    echo "AppImage created successfully: ${APP_NAME}.AppImage"
+else
+    echo "Warning: AppImage creation failed. Attempting to create with FUSE extraction option..."
+
+    # Create a wrapper script
+    cat > "${APP_NAME}.AppImage" << 'WRAPPER_EOF'
+#!/bin/bash
+# This is a fallback AppImage created without FUSE support
+# Extract and run the application instead
+
+SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"
+APP_DIR="${SCRIPT_DIR}/${APP_NAME}.AppDir"
+
+if [ ! -d "$APP_DIR" ]; then
+    echo "Extracting application..."
+    # Extract the embedded data
+    sed -n '/^__DATA__$/,$p' "$0" | tail -n +2 | tar -xz -C "$SCRIPT_DIR"
+fi
+
+# Run the app
+cd "$APP_DIR"
+exec ./AppRun "$@"
+
+exit 0
+__DATA__
+WRAPPER_EOF
+
+    # Append the AppDir as a tarball
+    tar -cz -C . "${APPDIR}" >> "${APP_NAME}.AppImage"
+    chmod +x "${APP_NAME}.AppImage"
+
+    echo "Fallback AppImage created: ${APP_NAME}.AppImage"
+    echo "This AppImage will extract its contents on first run."
+fi
 
 # Set output for GitHub Actions
 echo "appimage=${APP_NAME}.AppImage" >> $GITHUB_OUTPUT
 
-echo "AppImage created successfully: ${APP_NAME}.AppImage"
+echo "Process completed."

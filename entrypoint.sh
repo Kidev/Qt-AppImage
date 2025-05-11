@@ -86,21 +86,21 @@ fi
 # Create AppDir in current directory
 APPDIR="${APP_NAME}.AppDir"
 rm -rf "$APPDIR"
-mkdir -p "$APPDIR"
+mkdir -p "$APPDIR/bin"
 
 # Store current directory
 CURRENT_DIR=$(pwd)
 
-# Copy binary (before changing directory)
-echo "Copying binary from $BINARY_FULL_PATH to $APPDIR/$BINARY"
-cp "$BINARY_FULL_PATH" "$APPDIR/$BINARY"
+# Copy binary to bin directory
+echo "Copying binary from $BINARY_FULL_PATH to $APPDIR/bin/$BINARY"
+cp "$BINARY_FULL_PATH" "$APPDIR/bin/$BINARY"
 
 # Make sure binary is executable
-chmod +x "$APPDIR/$BINARY"
+chmod +x "$APPDIR/bin/$BINARY"
 
 # Copy qt.conf if exists
 if [ -f "$INSTALL_FOLDER/bin/qt.conf" ]; then
-    cp "$INSTALL_FOLDER/bin/qt.conf" "$APPDIR/"
+    cp "$INSTALL_FOLDER/bin/qt.conf" "$APPDIR/bin/"
 fi
 
 # Copy libraries
@@ -129,7 +129,7 @@ cd "$APPDIR"
 cat > AppRun << 'EOF'
 #!/bin/bash
 HERE="$(dirname "$(readlink -f "${0}")")"
-export PATH="${HERE}:${PATH}"
+export PATH="${HERE}/bin:${PATH}"
 export LD_LIBRARY_PATH="${HERE}/lib:${LD_LIBRARY_PATH}"
 export QT_PLUGIN_PATH="${HERE}/plugins"
 export QML2_IMPORT_PATH="${HERE}/qml"
@@ -137,7 +137,7 @@ export QT_QPA_PLATFORM_PLUGIN_PATH="${HERE}/plugins/platforms"
 export QT_XCB_GL_INTEGRATION=xcb_egl
 
 # Run the application
-exec "${HERE}/BINARY_PLACEHOLDER" "$@"
+exec "${HERE}/bin/BINARY_PLACEHOLDER" "$@"
 EOF
 
 # Replace placeholder with actual binary name
@@ -191,26 +191,28 @@ echo "Creating AppImage..."
 if /usr/local/bin/appimagetool "$APPDIR" "${APP_NAME}.AppImage" > appimage_log.txt 2>&1; then
     echo "AppImage created successfully: ${APP_NAME}.AppImage"
 else
-    echo "Warning: AppImage creation failed. Attempting to create with FUSE extraction option..."
+    echo "Warning! AppImage creation failed:"
+    cat appimage_log.txt
+    echo "\nAttempting to create with FUSE extraction option..."
 
     # Create a wrapper script
-    cat > "${APP_NAME}.AppImage" << 'WRAPPER_EOF'
+    cat > "${APP_NAME}.AppImage" << WRAPPER_EOF
 #!/bin/bash
 # This is a fallback AppImage created without FUSE support
 # Extract and run the application instead
 
-SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"
-APP_DIR="${SCRIPT_DIR}/${APP_NAME}.AppDir"
+SCRIPT_DIR="\$(dirname "\$(readlink -f "\$0")")"
+APP_DIR="\${SCRIPT_DIR}/${APPDIR}"
 
-if [ ! -d "$APP_DIR" ]; then
+if [ ! -d "\$APP_DIR" ]; then
     echo "Extracting application..."
     # Extract the embedded data
-    sed -n '/^__DATA__$/,$p' "$0" | tail -n +2 | tar -xz -C "$SCRIPT_DIR"
+    sed -n '/^__DATA__\$/,\$p' "\$0" | tail -n +2 | tar -xz -C "\$SCRIPT_DIR"
 fi
 
 # Run the app
-cd "$APP_DIR"
-exec ./AppRun "$@"
+cd "\$APP_DIR"
+exec ./AppRun "\$@"
 
 exit 0
 __DATA__

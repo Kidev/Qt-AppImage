@@ -46,6 +46,7 @@ on:
 
 jobs:
   build:
+    name: Build, package, release
     runs-on: ubuntu-24.04
     steps:
       # Checkout your repo
@@ -81,28 +82,16 @@ jobs:
         id: get_version
         run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
 
-      # Create release for version
-      - name: Create Release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # Create release and upload AppImage
+      - name: Create and Upload Release
+        uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref }}
-          release_name: MyApplication ${{ steps.get_version.outputs.VERSION }}
+          files: ${{ steps.appimage.outputs.appimage }}
+          name: MyApplication ${{ steps.get_version.outputs.VERSION }}
           draft: false
           prerelease: false
-
-      # Upload AppImage into release
-      - name: Upload Release Asset
-        uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ${{ steps.appimage.outputs.appimage }}
-          asset_name: MyApplication-${{ steps.get_version.outputs.VERSION }}.AppImage
-          asset_content_type: application/octet-stream
 ```
 
 ## Requirements
@@ -115,7 +104,7 @@ The folder with your Qt app installed must contain:
   
 ## Example usage
 
-The easiest way to make the folder of `qt_install` compatible is to use the Qt features.  
+The easiest way to make the folder of `install_folder` compatible is to use the Qt features.  
 Here is a typical CMakeLists.txt that works perfectly for Linux, and handles:  
 - C++ sources (*.cpp *.h *.hpp *.hxx...)  
 - QML files (*.qml) grouped in a module  
@@ -173,7 +162,7 @@ qt_add_executable(${PROJECT_NAME} ${SOURCES_CPP} ${SOURCES_HPP})
 # Allows to use this in main.cpp to show your qml/Main.qml: 
 # engine.loadFromModule("qml", "Main");
 qt_add_qml_module(
-    ${PROJECT_NAME}_qml
+    ${PROJECT_NAME}
     URI "qml"
     QML_FILES ${SOURCES_QML}
     RESOURCE_PREFIX "/qt/qml"
@@ -192,7 +181,6 @@ target_include_directories(
 target_link_libraries(
     ${PROJECT_NAME}
     PUBLIC 
-        ${PROJECT_NAME}_qml
         Qt6::Core
         Qt6::Gui
         Qt6::Quick

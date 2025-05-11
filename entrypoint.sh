@@ -18,6 +18,10 @@ echo "Icon: $ICON"
 echo "Binary: $BINARY"
 echo "=========================="
 
+# Convert to absolute path
+INSTALL_FOLDER=$(realpath "$INSTALL_FOLDER")
+echo "Absolute install folder: $INSTALL_FOLDER"
+
 # Validate install folder exists
 if [ ! -d "$INSTALL_FOLDER" ]; then
     echo "Error: install folder '$INSTALL_FOLDER' does not exist"
@@ -79,42 +83,47 @@ if [ -z "$APP_NAME" ]; then
     echo "Deduced app name: $APP_NAME"
 fi
 
-# Create AppDir
+# Create AppDir in current directory
 APPDIR="${APP_NAME}.AppDir"
 rm -rf "$APPDIR"
 mkdir -p "$APPDIR"
-cd "$APPDIR"
 
-# Copy binary
-echo "Copying binary from $BINARY_FULL_PATH to ./$BINARY"
-cp "$BINARY_FULL_PATH" ./$BINARY
+# Store current directory
+CURRENT_DIR=$(pwd)
+
+# Copy binary (before changing directory)
+echo "Copying binary from $BINARY_FULL_PATH to $APPDIR/$BINARY"
+cp "$BINARY_FULL_PATH" "$APPDIR/$BINARY"
 
 # Make sure binary is executable
-chmod +x ./$BINARY
+chmod +x "$APPDIR/$BINARY"
 
 # Copy qt.conf if exists
 if [ -f "$INSTALL_FOLDER/bin/qt.conf" ]; then
-    cp "$INSTALL_FOLDER/bin/qt.conf" .
+    cp "$INSTALL_FOLDER/bin/qt.conf" "$APPDIR/"
 fi
 
 # Copy libraries
 if [ -d "$INSTALL_FOLDER/lib" ]; then
-    cp -r "$INSTALL_FOLDER/lib" .
+    cp -r "$INSTALL_FOLDER/lib" "$APPDIR/"
 else
     echo "Warning: No lib directory found in $INSTALL_FOLDER"
 fi
 
 # Copy plugins
 if [ -d "$INSTALL_FOLDER/plugins" ]; then
-    cp -r "$INSTALL_FOLDER/plugins" .
+    cp -r "$INSTALL_FOLDER/plugins" "$APPDIR/"
 else
     echo "Warning: No plugins directory found in $INSTALL_FOLDER"
 fi
 
 # Copy QML modules if they exist
 if [ -d "$INSTALL_FOLDER/qml" ]; then
-    cp -r "$INSTALL_FOLDER/qml" .
+    cp -r "$INSTALL_FOLDER/qml" "$APPDIR/"
 fi
+
+# Now change into AppDir for creating internal files
+cd "$APPDIR"
 
 # Create AppRun script
 cat > AppRun << 'EOF'
@@ -147,19 +156,34 @@ Categories=${CATEGORY};
 Terminal=false
 EOF
 
-# Handle icon
-if [ -n "$ICON" ] && [ -f "$ICON" ]; then
-    cp "$ICON" "${BINARY}.png"
+# Handle icon - convert icon path to absolute if it's relative
+if [ -n "$ICON" ]; then
+    # Make icon path absolute if it's relative
+    if [[ ! "$ICON" = /* ]]; then
+        ICON="${CURRENT_DIR}/${ICON}"
+    fi
+
+    if [ -f "$ICON" ]; then
+        cp "$ICON" "${BINARY}.png"
+    else
+        echo "Warning: Icon file not found at $ICON, creating default icon..."
+        create_default_icon
+    fi
 else
-    # Create a simple default icon
     echo "Creating default icon..."
+    create_default_icon
+fi
+
+# Function to create default icon
+create_default_icon() {
     convert -size 128x128 xc:transparent -fill "#41cd52" -draw "circle 64,64 64,16" \
         -fill white -pointsize 48 -gravity center -annotate 0 "Qt" "${BINARY}.png"
-fi
+}
 
 # Strip debug symbols to reduce size
 find lib -name "*.so*" -type f -exec strip {} \; 2>/dev/null || true
 
+# Go back to the original directory for creating the AppImage
 cd ..
 
 # Create AppImage

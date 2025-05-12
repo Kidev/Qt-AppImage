@@ -33,6 +33,7 @@ outputs:
 
 runs:
   using: 'docker'
+  options: '--cap-add SYS_ADMIN --device /dev/fuse'
   image: 'Dockerfile'
   args:
     - ${{ inputs.install_folder }}

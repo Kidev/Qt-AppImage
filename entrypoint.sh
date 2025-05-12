@@ -18,6 +18,23 @@ echo "Icon: $ICON"
 echo "Binary: $BINARY"
 echo "=========================="
 
+echo "Attempting to load FUSE module..."
+if ! lsmod | grep -q "^fuse "; then
+    echo "FUSE module not loaded, attempting to load it..."
+    if modprobe fuse 2>/dev/null; then
+        echo "Successfully loaded FUSE module"
+    else
+        echo "Failed to load FUSE module, trying with sudo..."
+        if sudo modprobe fuse 2>/dev/null; then
+            echo "Successfully loaded FUSE module with sudo"
+        else
+            echo "Failed to load FUSE module even with sudo"
+        fi
+    fi
+else
+    echo "FUSE module is already loaded"
+fi
+
 # Convert to absolute path
 INSTALL_FOLDER=$(realpath "$INSTALL_FOLDER")
 echo "Absolute install folder: $INSTALL_FOLDER"

@@ -32,16 +32,25 @@ outputs:
     description: 'Path to the generated AppImage file'
 
 runs:
-  using: 'docker'
-  options: '--cap-add SYS_ADMIN --device /dev/fuse'
-  image: 'Dockerfile'
-  args:
-    - ${{ inputs.install_folder }}
-    - ${{ inputs.app_name }}
-    - ${{ inputs.comment }}
-    - ${{ inputs.category }}
-    - ${{ inputs.icon }}
-    - ${{ inputs.binary }}
+  using: "composite"
+  steps:
+    - name: Build Docker image
+      run: |
+        docker build -t qt-appimage:latest -f ${{ github.action_path }}/Dockerfile ${{ github.action_path }}
+      shell: bash
+
+    - name: Run container
+      run: |
+        docker run --cap-add SYS_ADMIN --device /dev/fuse \
+          -v ${{ github.workspace }}:/workspace \
+          qt-appimage:latest \
+          ${{ inputs.install_folder }} \
+          ${{ inputs.app_name }} \
+          ${{ inputs.comment }} \
+          ${{ inputs.category }} \
+          ${{ inputs.icon }} \
+          ${{ inputs.binary }}
+      shell: bash
 
 branding:
   icon: 'package'

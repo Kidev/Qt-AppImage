@@ -12,8 +12,8 @@ RUN apt-get update && apt-get install -y \
     imagemagick \
     tar \
     gzip \
+    kmod \
     fuse \
-    libfuse2 \
     && rm -rf /var/lib/apt/lists/*
 
 # Download appimagetool

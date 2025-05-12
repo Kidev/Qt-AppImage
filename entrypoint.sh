@@ -173,6 +173,12 @@ Categories=${CATEGORY};
 Terminal=false
 EOF
 
+# Function to create default icon
+create_default_icon() {
+    convert -size 128x128 xc:transparent -fill "#41cd52" -draw "circle 64,64 64,16" \
+        -fill white -pointsize 48 -gravity center -annotate 0 "Qt" "${BINARY}.png"
+}
+
 # Handle icon - convert icon path to absolute if it's relative
 if [ -n "$ICON" ]; then
     # Make icon path absolute if it's relative
@@ -191,11 +197,7 @@ else
     create_default_icon
 fi
 
-# Function to create default icon
-create_default_icon() {
-    convert -size 128x128 xc:transparent -fill "#41cd52" -draw "circle 64,64 64,16" \
-        -fill white -pointsize 48 -gravity center -annotate 0 "Qt" "${BINARY}.png"
-}
+
 
 # Strip debug symbols to reduce size
 find lib -name "*.so*" -type f -exec strip {} \; 2>/dev/null || true
